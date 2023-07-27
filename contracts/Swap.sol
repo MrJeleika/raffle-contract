@@ -17,17 +17,17 @@ contract Swap{
       function swapTokenForETH(address tokenAddress, uint256 amountIn) external returns (uint256 amountOut) {
 
           // Transfer the specified amount of WETH9 to this contract.
-          TransferHelper.safeTransferFrom(WETH9, msg.sender, address(this), amountIn);
+          TransferHelper.safeTransferFrom(tokenAddress, msg.sender, address(this), amountIn);
           // Approve the router to spend WETH9.
-          TransferHelper.safeApprove(WETH9, address(swapRouter), amountIn);
+          TransferHelper.safeApprove(tokenAddress, address(swapRouter), amountIn);
           // Note: To use this example, you should explicitly set slippage limits, omitting for simplicity
           uint256 minOut = /* Calculate min output */ 0;
           uint160 priceLimit = /* Calculate price limit */ 0;
           // Create the params that will be used to execute the swap
           ISwapRouter.ExactInputSingleParams memory params =
               ISwapRouter.ExactInputSingleParams({
-                  tokenIn: WETH9,
-                  tokenOut: tokenAddress,
+                  tokenIn: tokenAddress,
+                  tokenOut: WETH9,
                   fee: feeTier,
                   recipient: msg.sender,
                   deadline: block.timestamp,
@@ -37,5 +37,6 @@ contract Swap{
               });
           // The call to `exactInputSingle` executes the swap.
           amountOut = swapRouter.exactInputSingle(params);
+          return amountOut;
       }
 }

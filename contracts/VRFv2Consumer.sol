@@ -71,7 +71,7 @@ contract VRFv2Consumer is VRFConsumerBaseV2 {
      * @notice Requests randomness
      * Assumes the subscription is funded sufficiently; "Words" refers to unit of data in Computer Science
      */
-    function requestRandomWords() external onlyOwner {
+    function requestRandomWords() external  {
         // Will revert if subscription is not set and funded.
         s_requestId = COORDINATOR.requestRandomWords(
             s_keyHash,

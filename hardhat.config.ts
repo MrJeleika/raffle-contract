@@ -16,9 +16,9 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking: {
         enabled: true,
-        url: `https://goerli.infura.io/v3/19babb07c31c4e1c80f9e94f20527f6a`,
+        url: `https://mainnet.infura.io/v3/${process.env.KEY}`,
       },
-      chainId: 5,
+      chainId: 1,
     },
   },
 };
