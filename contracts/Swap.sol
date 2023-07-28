@@ -14,12 +14,12 @@ contract Swap{
         swapRouter = _swapRouter;
       }
       
-      function swapTokenForETH(address tokenAddress, uint256 amountIn) external returns (uint256 amountOut) {
+      function swapTokenForETH(address tokenAddress, uint256 amountIn, address sender, address receiver) external returns (uint256 amountOut) {
 
-          // Transfer the specified amount of WETH9 to this contract.
-          TransferHelper.safeTransferFrom(tokenAddress, msg.sender, address(this), amountIn);
-          // Approve the router to spend WETH9.
           TransferHelper.safeApprove(tokenAddress, address(swapRouter), amountIn);
+          // Transfer the specified amount of WETH9 to this contract.
+          TransferHelper.safeTransferFrom(tokenAddress, sender, address(this), amountIn);
+          // Approve the router to spend WETH9.
           // Note: To use this example, you should explicitly set slippage limits, omitting for simplicity
           uint256 minOut = /* Calculate min output */ 0;
           uint160 priceLimit = /* Calculate price limit */ 0;
@@ -29,7 +29,7 @@ contract Swap{
                   tokenIn: tokenAddress,
                   tokenOut: WETH9,
                   fee: feeTier,
-                  recipient: msg.sender,
+                  recipient: receiver,
                   deadline: block.timestamp,
                   amountIn: amountIn,
                   amountOutMinimum: minOut,
