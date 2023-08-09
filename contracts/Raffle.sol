@@ -11,6 +11,12 @@ import './VRFv2Consumer.sol';
 import './VRFMock.sol';
 import './Swap.sol';
 
+
+// Мы 2 раза выбираем число
+// 1 раз выбрать токен который выиграл
+// 2 раз выбрать юзера, у юзера будет from, to только в монетках не переведенных в $
+
+
 // if we can use offchain choosing of number, we can use array with structs that has range of winning numbers
 // And then pass that array on backend and random number to find the right address
 interface IERC20Extented is IERC20 {
@@ -34,14 +40,47 @@ contract Raffle {
   uint256 public totalPoolBalance;
   uint256 public randomNum;
   mapping(address => address) public tokenFeed; // Token address => chainlink feed
-  mapping(address => bool) private playedTokensMap;
+  mapping(address => uint256) private playedTokensBalance;
+  struct TokenWinningNumbers{
+    uint256 from;
+    uint256 to;
+    address token;
+  }
+  TokenWinningNumbers[] private tokenWinningNumbers;
 
   struct UserNumbers{
     uint256 from;
     uint256 to;
     address user;
   }
-  // TODO: Сделать геттеры для функций
+
+  struct UserNumbers2{
+    uint256 from;
+    uint256 to;
+    address user;
+    address token;
+  }
+
+  UserNumbers2[][] public poolUsers2; 
+  //*Get index of array to insert offchain
+  // poolUsers2.push(new UserNumbers2[](1)); // Create a new array with one element
+  // poolUsers2[poolUsers2.length - 1][0] = newUser; // Assign the new struct to the last element
+
+  // *Selectin winner
+  // Get chanses of all tokens to win
+  // Roll random num to select token
+  // Roll random num to select user
+
+  /*
+    
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (randomNumber < tokens[i].weight) {
+                return tokens[i].tokenAddress;
+            }
+            randomNumber -= tokens[i].weight;
+        } 
+   */
+
   address[] public playedTokens;
   UserNumbers[] public poolUsers;
   UserNumbers[] public emptyArray;
@@ -65,7 +104,7 @@ contract Raffle {
     tokenFeed[tokenAddress] = dataFeedAddress;
   }
 
-  function deposit(uint256 amount, address tokenAddress, uint8 v, bytes32 r, bytes32 s) external {
+  function deposit(uint256 amount, address tokenAddress, uint8 index, uint8 v, bytes32 r, bytes32 s) external {
     console.log(amount);
     require(amount > 0, "Amount == 0");
     require(!isEnded, "Raffle ended");
@@ -74,24 +113,29 @@ contract Raffle {
     // ! Проверять цену при передаче юзеру
     // ? Когда юзер будет депозитить можно писать в USD, видел пример на cyberconnect
     // https://link3.to/cybertrek
+
+    
     IERC20Permit(tokenAddress).permit(msg.sender, address(this), amount, block.timestamp + 10 weeks, v, r, s);
-    uint256 price = priceData.getLatestData(tokenFeed[tokenAddress]);
 
     IERC20(tokenAddress).safeTransferFrom(msg.sender, address(this), amount);
     
-    if(!playedTokensMap[tokenAddress]){
-      playedTokens.push(tokenAddress);
-      playedTokensMap[tokenAddress] = true;
-    }
-
-    // Since we have 6 and 18 decimals tokens, we have to set it to 6 to match USD
     if(IERC20Extented(tokenAddress).decimals() != 6){
       amount /= 10 ** (IERC20Extented(tokenAddress).decimals() - 6);
     }
 
-    UserNumbers memory userNumber = UserNumbers(totalPoolBalance, totalPoolBalance + (amount * price), msg.sender);
-    totalPoolBalance += (amount * price);
-    poolUsers.push(userNumber);
+    if(playedTokensBalance[tokenAddress] == 0){
+      playedTokens.push(tokenAddress);
+      poolUsers2.push(new UserNumbers2[](1));
+      poolUsers2[poolUsers2.length - 1][0] = UserNumbers2(0, amount, msg.sender, tokenAddress);
+    }else{
+      poolUsers2[index].push(UserNumbers2(playedTokensBalance[tokenAddress], playedTokensBalance[tokenAddress] + amount, msg.sender, tokenAddress));
+    }
+
+    playedTokensBalance[tokenAddress] += amount;
+    // Since we have 6 and 18 decimals tokens, we have to set it to 6 to match USD
+
+    totalPoolBalance += amount;
+
     emit Deposit(amount, msg.sender, tokenAddress);
   }
   
@@ -105,6 +149,24 @@ contract Raffle {
   
   
   function selectWinner(uint256 userIndex, uint256 _randomNum) public onlyOwner{
+    uint256 totalBalanceUSD;
+
+    for(uint8 i = 0; i < playedTokens.length; i++){
+      address token = playedTokens[i];
+      uint256 price = priceData.getLatestData(token);
+      tokenWinningNumbers.push(TokenWinningNumbers(totalBalanceUSD, totalBalanceUSD + playedTokensBalance[token] * price, token));
+      totalBalanceUSD += playedTokensBalance[token] * price;
+    }
+    random.requestRandomWords();
+    mock.fulfillRandomWords(random.s_requestId(), address(random));
+
+    for(uint8 i = 0; i < playedTokens.length; i++){
+      address token = playedTokens[i];
+      uint256 price = priceData.getLatestData(token);
+      playedTokensBalanceUSD[token] = playedTokensBalance[token] * price;
+      totalBalanceUSD += playedTokensBalance[token] * price;
+    }
+
     UserNumbers memory user = poolUsers[userIndex];
     require(randomNum != 0, "Wrong number");
     require(user.from < _randomNum && user.to >= _randomNum && randomNum == _randomNum, 'Wrong winner');
@@ -114,7 +176,7 @@ contract Raffle {
 
     for(uint256 i = 0; i < playedTokens.length; i++) {
       address token = playedTokens[i];
-      playedTokensMap[token] = false;
+      playedTokensBalance[token] = 0;
       uint256 userBalance = IERC20(token).balanceOf(address(this));
       (bool success, ) = address(token).call(abi.encodeWithSignature("approve(address,uint256)", address(swap), userBalance));
       require(success, "ERC20 approval failed");
