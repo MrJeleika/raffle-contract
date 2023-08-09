@@ -1,10 +1,28 @@
-import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { parseEther, parseUnits } from 'ethers';
+import { keccak256 } from 'ethereumjs-util';
+import { HardhatEthersSigner } from '@nomicfoundation/hardhat-ethers/signers';
 import { ethers } from 'hardhat';
+import { expect } from 'chai';
+import { parseEther, parseUnits, solidityPacked } from 'ethers';
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
+import { Raffle } from '../typechain-types';
 
 const usdtTokenAddress = '0xdAC17F958D2ee523a2206206994597C13D831ec7';
+const maticTokenAddress = '0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0';
+const wethTokenAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
 
 async function main() {
+  const selectWinner = async (raffle: Raffle) => {
+    await raffle.selectRandomNum();
+    const randomNum = await raffle.randomNum();
+    const users = await raffle.getPoolUsers();
+    for (let i = 0; i < users.length; i++) {
+      if (users[i][0] < randomNum && users[i][1] >= randomNum) {
+        await raffle.selectWinner(i, randomNum);
+        break;
+      }
+    }
+  };
+
   const deployRaffleTexture = async () => {
     const [owner, user] = await ethers.getSigners();
 
@@ -38,31 +56,22 @@ async function main() {
 
     await mock.addConsumer(1, await consumer.getAddress());
     await mock.addConsumer(1, await raffle.getAddress());
+    const USDT = await ethers.getContractAt('ERC20', usdtTokenAddress);
+    const MATIC = await ethers.getContractAt('ERC20', maticTokenAddress);
+    const WETH = await ethers.getContractAt('ERC20', wethTokenAddress);
 
-    return { owner, user, raffle, swap };
+    return { owner, user, raffle, swap, USDT, MATIC, WETH };
   };
-  const { owner, user, raffle, swap } = await loadFixture(deployRaffleTexture);
+  const { owner, user, raffle, swap, USDT, MATIC } = await loadFixture(
+    deployRaffleTexture,
+  );
 
-  const USDT = await ethers.getContractAt('ERC20', usdtTokenAddress);
+  await raffle.allowToken(
+    '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+    '0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9',
+  );
 
-  console.log(await ethers.provider.getBalance(owner.address));
-  console.log(await USDT.balanceOf(owner.address));
-
-  // Get the balance of the owner's address
-
-  await USDT.approve(await swap.getAddress(), parseUnits('1000'));
-  await USDT.approve(await raffle.getAddress(), parseUnits('1000'));
-
-  await raffle.deposit(parseUnits('1000'), await USDT.getAddress());
-
-  console.log(await USDT.balanceOf(owner.address));
-  await raffle.selectRandomNum();
-
-  // console.log(await raffle.getAddress());
-  // const res = await raffle.selectRandomWord(
-  //   '0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6',
-  // );
-  // console.log(res);
+  console.log(await raffle.getAddress());
 }
 
 main().catch((error) => {
