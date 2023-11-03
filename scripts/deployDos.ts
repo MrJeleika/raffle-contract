@@ -11,18 +11,6 @@ const maticTokenAddress = '0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0';
 const wethTokenAddress = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
 
 async function main() {
-  const selectWinner = async (raffle: Raffle) => {
-    await raffle.selectRandomNum();
-    const randomNum = await raffle.randomNum();
-    const users = await raffle.getPoolUsers();
-    for (let i = 0; i < users.length; i++) {
-      if (users[i][0] < randomNum && users[i][1] >= randomNum) {
-        await raffle.selectWinner(i, randomNum);
-        break;
-      }
-    }
-  };
-
   const deployRaffleTexture = async () => {
     const [owner, user] = await ethers.getSigners();
 
